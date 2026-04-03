@@ -272,6 +272,9 @@ function parseSMTPError(errString) {
 
 	// Error has occurred when status code is > 400
 	if (status > 400) {
+		// In parseSMTPError, right after: if (status > 400) {
+		console.log(`🔍 DEBUG parseSMTPError: status=${status}, raw_start="${errString.substring(0, 50)}"`);
+		console.log(`🔍 DEBUG blacklist match: ${includesAny(errString, ...blacklist_keywords)}`);
 		if (includesAny(errString, ...invalid_email_keywords)) {
 			return newLookupError(smtpErrors.ErrServerUnavailable, errString);
 		}
