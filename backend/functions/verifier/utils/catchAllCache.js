@@ -66,7 +66,9 @@ class CatchAllCache {
 				[domain, catch_all, confidence, test_count, expires_at, created_at]
 			);
 
-			this.logger.debug(`Cached catch-all for ${domain}: ${is_catch_all} (confidence: ${confidence}%, tests: ${test_count})`);
+			this.logger.debug(
+				`Cached catch-all for ${domain}: ${is_catch_all} (confidence: ${confidence}%, tests: ${test_count})`
+			);
 			success = true;
 		} catch (error) {
 			this.logger.error(`CatchAllCache cache() error -> ${error?.toString()}`);
@@ -74,7 +76,18 @@ class CatchAllCache {
 			return success;
 		}
 	}
-
+	/** clear cache for a specific domain
+	 * @param {string} domain
+	 */
+	async clear(domain) {
+		await this.waitForReady();
+		try {
+			await sqlAsync.runAsync(`DELETE FROM ${this.table_name} WHERE domain = ?`, [domain]);
+			this.logger.debug(`Cleared cache for domain: ${domain}`);
+		} catch (error) {
+			this.logger.error(`CatchAllCache clear() error -> ${error?.toString()}`);
+		}
+	}
 	/** Enhanced fetch data from cache with validation
 	 * @param {string} domain
 	 * @returns {Promise<boolean | null>} - null if not cached or confidence too low, boolean if reliable cache hit
@@ -89,24 +102,28 @@ class CatchAllCache {
 			if (sqlRes) {
 				/** @type {any} */
 				const obj = sqlRes;
-				
+
 				// Validate cache entry before using it
 				if (!this.isCacheValid(obj)) {
 					this.logger.debug(`Cache entry for ${domain} is invalid or expired, skipping cache`);
 					return null;
 				}
-				
+
 				// Check confidence threshold
 				const confidence = parseInt(obj?.confidence || 0, 10);
 				if (confidence < this.minConfidenceThreshold) {
-					this.logger.debug(`Cache entry for ${domain} has low confidence (${confidence}%), requiring fresh verification`);
+					this.logger.debug(
+						`Cache entry for ${domain} has low confidence (${confidence}%), requiring fresh verification`
+					);
 					return null;
 				}
-				
+
 				if (obj?.catch_all == '1') catch_all = true;
 				else if (obj?.catch_all == '0') catch_all = false;
-				
-				this.logger.debug(`Cache hit for ${domain}: ${catch_all} (confidence: ${confidence}%, tests: ${obj?.test_count || 1})`);
+
+				this.logger.debug(
+					`Cache hit for ${domain}: ${catch_all} (confidence: ${confidence}%, tests: ${obj?.test_count || 1})`
+				);
 			}
 		} catch (error) {
 			this.logger.error(`CatchAllCache check() error -> ${error?.toString()}`);
@@ -181,28 +198,30 @@ class CatchAllCache {
 	 */
 	isCacheValid(cacheEntry) {
 		if (!cacheEntry) return false;
-		
+
 		const now = new Date().getTime();
 		const expiresAt = parseInt(cacheEntry.expires_at || 0, 10);
-		
+
 		// Check if cache entry has expired
 		if (expiresAt > 0 && now > expiresAt) {
 			return false;
 		}
-		
+
 		// Check if cache entry has required fields
 		if (cacheEntry.catch_all === undefined || cacheEntry.catch_all === null) {
 			return false;
 		}
-		
+
 		// Check minimum age to avoid very fresh entries that might be unstable
 		const createdAt = parseInt(cacheEntry.created_at || 0, 10);
 		const minAge = 5 * 60 * 1000; // 5 minutes minimum age
-		if (createdAt > 0 && (now - createdAt) < minAge) {
-			this.logger.debug(`Cache entry too fresh (${Math.round((now - createdAt) / 1000)}s old), requiring verification`);
+		if (createdAt > 0 && now - createdAt < minAge) {
+			this.logger.debug(
+				`Cache entry too fresh (${Math.round((now - createdAt) / 1000)}s old), requiring verification`
+			);
 			return false;
 		}
-		
+
 		return true;
 	}
 

@@ -206,6 +206,14 @@ class SMTPVerificationSC {
 				this._verificationQueue.push(job);
 				this._emailStates.set(email, job);
 
+				// const existingCache = await catchAllCache.check(domain);
+				// if (existingCache === true) {
+				// 	// Verify the cache isn't suspiciously fresh or from an unreliable check
+				// 	// For now, clear it and re-verify — better to re-verify than show wrong result
+				// 	// In future: could check if cache was set during an IP-block event
+				// 	this.logger.debug(`Clearing potentially stale catch-all cache for ${domain} before verification`);
+				// 	await catchAllCache.clear(domain);
+				// }
 				// create dummy result map
 				this.smtpReports.set(email, {
 					email: email,
@@ -1264,6 +1272,8 @@ class SMTPVerificationSC {
 				break;
 			}
 			case smtpErrors.ErrBlocked: {
+				const { domain } = emailSplit(email);
+				catchAllCache.clear(domain);
 				// The SMTP server could also be blocked
 				if (!not_catchall_email)
 					this.updateResultForEmail(
