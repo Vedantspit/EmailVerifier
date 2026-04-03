@@ -153,7 +153,10 @@ function parseSmtpErrorEnhanced(errString, currentStage = '', emailBeingTested =
 		analysis.confidence = 85;
 		return analysis;
 	}
-
+	// Temporary debug - add right before the blacklist check in parseSMTPError
+	console.log(
+		`🔍 parseSMTPError status=${status}, hasBlacklist=${includesAny(errString, ...blacklist_keywords)}, str=${errString.substring(0, 80)}`
+	);
 	//added below to check if 450 contains blacklisted
 	if (includesAny(errString, ...blacklist_keywords)) {
 		analysis.errorType = 'ip_blocked';
