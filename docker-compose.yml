@@ -1,0 +1,61 @@
+services:
+    brandnavemailverifier:
+        build:
+            context: .
+            dockerfile: Dockerfile
+
+        container_name: brandnavemailverifier-app28march
+
+        # Port mapping: host:container
+        # Only expose to localhost - nginx will proxy to it
+        ports:
+            - '127.0.0.1:5000:5000'
+
+        # Load environment variables from backend/.env file
+        env_file:
+            - backend/.env
+
+        # Environment variables (loaded from backend/.env)
+        # You can override specific variables here if needed
+        # All variables from backend/.env are automatically loaded
+        environment:
+            # Force production mode in Docker
+            - NODE_ENV=production
+
+        # Volume mounts for data persistence (bind mounts to host)
+        volumes:
+            # SQLite database files
+            - ./.data/db:/app/backend/.sql
+
+            # CSV files
+            - ./.data/csv:/app/backend/csv
+
+            # Application logs
+            - ./.data/logs:/app/backend/.logs
+
+        # Restart policy
+        restart: unless-stopped
+
+        # Network configuration
+        # Default bridge network allows outbound connections on any port including port 25
+        networks:
+            - default
+
+        # Health check
+        healthcheck:
+            test:
+                [
+                    'CMD',
+                    'node',
+                    '-e',
+                    "require('http').get('http://localhost:5000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})",
+                ]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+
+# Default network
+networks:
+    default:
+        driver: bridge

@@ -1,0 +1,93 @@
+/**
+ * API Key revoke route function
+ * Handles revoking API keys for users
+ */
+
+const { getDatabase } = require('../../../database/connection');
+
+
+/**
+ * Handle API key revocation
+ * @param {import('express').Request} req - Express request object
+ * @param {import('express').Response} res - Express response object
+ * @returns {Promise<import('express').Response | void>}
+ */
+async function handleRevokeApiKey(req, res) {
+    try {
+        const { id } = req.params;
+
+        // Validate API key ID
+        const keyId = parseInt(id, 10);
+        if (isNaN(keyId) || keyId <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid API key ID.'
+            });
+        }
+
+        const db = getDatabase();
+
+        // Check if API key exists (single-user system)
+        const apiKey = /** @type {{
+            id: number,
+            name: string,
+            is_revoked: number
+        } | undefined} */ (db.prepare(`
+            SELECT id, name, is_revoked
+            FROM api_keys
+            WHERE id = ?
+        `).get(keyId));
+
+        if (!apiKey) {
+            return res.status(404).json({
+                success: false,
+                message: 'API key not found or already revoked.'
+            });
+        }
+
+        // Check if already revoked (treat as not found for security)
+        if (apiKey.is_revoked === 1) {
+            return res.status(404).json({
+                success: false,
+                message: 'API key not found or already revoked.'
+            });
+        }
+
+        // Revoke the API key
+        const revokeKey = db.prepare(`
+            UPDATE api_keys
+            SET is_revoked = 1
+            WHERE id = ?
+        `);
+
+        revokeKey.run(keyId);
+
+        // Return success response
+        res.status(200).json({
+            success: true,
+            message: 'API key revoked successfully',
+            data: {
+                id: apiKey.id,
+                name: apiKey.name,
+                revoked_at: new Date().toISOString()
+            }
+        });
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('API key revocation failed:', errorMessage);
+
+        res.status(500).json({
+            success: false,
+            message: 'Failed to revoke API key. Please try again.'
+        });
+    } finally {
+        console.debug('API key revocation process completed');
+    }
+}
+
+
+// Export function
+module.exports = {
+    handleRevokeApiKey
+};
