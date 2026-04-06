@@ -221,7 +221,7 @@ class VerifierInstance {
 		const blacklistedEmails = [];
 		/** @type {string[]} = emails that requires recheck */
 		const recheckRequired = [];
-
+		let processedCount = 0;
 		// add dummy data from the quick verifier results
 		const emails = quickVerificationResult.keys();
 		for (const email of emails) {
@@ -275,6 +275,7 @@ class VerifierInstance {
 							...loginRes,
 						});
 				}
+				processedCount += microsoftEmails.length;
 			}
 
 			// run alternate verification methods for yahoo emails
@@ -293,6 +294,7 @@ class VerifierInstance {
 							...yahooRes,
 						});
 				}
+				processedCount += yahooEmails.length;
 			}
 
 			// sort the emails according to MX organization - group by organization for rate limiting + skip MS & Yahoo emails
@@ -465,6 +467,7 @@ class VerifierInstance {
 													gravatar,
 													suggestion: '', // leaving this one for now
 												});
+												processedCount++;
 											}
 										}
 									} catch (keyError) {
@@ -482,7 +485,7 @@ class VerifierInstance {
 								this.parentPort.postMessage({
 									type: 'progress',
 									request_id: this.curr_request.request_id,
-									completed_emails: doneCount,
+									completed_emails: processedCount,
 								});
 							}
 						} catch (batchError) {
