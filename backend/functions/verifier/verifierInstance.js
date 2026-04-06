@@ -31,12 +31,12 @@ class VerifierInstance {
 		workerData?.index === 0
 			? winston.loggers.get(loggerTypes.verifier0)
 			: workerData?.index === 1
-			? winston.loggers.get(loggerTypes.verifier1)
-			: workerData?.index === 2
-			? winston.loggers.get(loggerTypes.verifier2)
-			: workerData?.index === 3
-			? winston.loggers.get(loggerTypes.verifier3)
-			: winston.loggers.get(loggerTypes.verifier);
+				? winston.loggers.get(loggerTypes.verifier1)
+				: workerData?.index === 2
+					? winston.loggers.get(loggerTypes.verifier2)
+					: workerData?.index === 3
+						? winston.loggers.get(loggerTypes.verifier3)
+						: winston.loggers.get(loggerTypes.verifier);
 	/** @private {import("worker_threads").MessagePort | null} Message port to connect to parent */
 	parentPort;
 
@@ -109,9 +109,8 @@ class VerifierInstance {
 			const quickVerificationResult = await this.quickVerification(this.curr_request?.emails);
 
 			// perform SMTP verfication for the ones that have MX records
-			const { finalResult, greylistedEmails, blacklistedEmails, recheckRequired } = await this.smtpVerification(
-				quickVerificationResult
-			);
+			const { finalResult, greylistedEmails, blacklistedEmails, recheckRequired } =
+				await this.smtpVerification(quickVerificationResult);
 
 			// clear the current request
 			const request_id = this.curr_request.request_id;
@@ -477,6 +476,14 @@ class VerifierInstance {
 								}
 							} catch (combineError) {
 								this.logger.error(`Error combining SMTP results:`, this.getErrorMessage(combineError));
+							}
+							if (this.parentPort && this.curr_request) {
+								const doneCount = Array.from(finalResult.values()).filter(r => r?.smtp).length;
+								this.parentPort.postMessage({
+									type: 'progress',
+									request_id: this.curr_request.request_id,
+									completed_emails: doneCount,
+								});
 							}
 						} catch (batchError) {
 							this.logger.error(

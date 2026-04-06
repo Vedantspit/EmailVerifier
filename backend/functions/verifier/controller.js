@@ -389,6 +389,13 @@ class Controller {
 						this.ping(workerIndex);
 						break;
 					}
+					case 'progress': {
+						// Update completed_emails count in DB for polling endpoint
+						this.updateResultsDB(msg.request_id, {
+							completed_emails: msg.completed_emails,
+						});
+						break;
+					}
 					case 'complete': {
 						// handle the complete and setup for anti greylisting
 						this.handlePartialComplete(
@@ -758,14 +765,14 @@ class Controller {
 				return {
 					email: result?.email || '',
 					status: 'unknown',
-					message: 'Invalid email data'
+					message: 'Invalid email data',
 				};
 			}
 
 			return {
 				email: categorized.email,
 				status: categorized.status,
-				message: categorized.reason
+				message: categorized.reason,
 			};
 		});
 	}
@@ -780,9 +787,7 @@ class Controller {
 	 * @returns {Promise<boolean>}
 	 */
 
-
-
-async sendResultsCallback(request_id, response_url, results, totalEmails, maxRetries = 5) {
+	async sendResultsCallback(request_id, response_url, results, totalEmails, maxRetries = 5) {
 		if (!response_url) {
 			this.logger.debug(`No response_url provided for request ${request_id}, skipping callback`);
 
@@ -860,7 +865,6 @@ async sendResultsCallback(request_id, response_url, results, totalEmails, maxRet
 		}
 	}
 
-
 	/**
 	 * Mark the request as 'verifying' in the database (updated to use local SQLite)
 	 * @private
@@ -869,9 +873,13 @@ async sendResultsCallback(request_id, response_url, results, totalEmails, maxRet
 	 * @returns {Promise<boolean>}
 	 */
 	async markAsVerifying(request_id, depth = 0) {
+		const assignment = this.request_assignments.find(r => r?.request_id === request_id);
+		const totalEmails = assignment?.emails?.length || 0;
+
 		return await this.updateResultsDB(request_id, {
 			status: 'processing',
 			verifying: true,
+			total_emails: totalEmails,
 		});
 	}
 
@@ -1175,7 +1183,9 @@ async sendResultsCallback(request_id, response_url, results, totalEmails, maxRet
 			this.logger.info('Updating disposable email domains list...');
 
 			// Fetch latest from API
-			const apiRes = await axiosGet('https://rawcdn.githack.com/disposable/disposable-email-domains/master/domains.json');
+			const apiRes = await axiosGet(
+				'https://rawcdn.githack.com/disposable/disposable-email-domains/master/domains.json'
+			);
 
 			if (!apiRes || apiRes.status !== 200) {
 				this.logger.warn('Failed to fetch disposable list: invalid response');
@@ -1218,7 +1228,9 @@ module.exports = disposableDomainsList;
 				// Write to file
 				fs.writeFileSync(listPath, fileContent, 'utf8');
 
-				this.logger.info(`✅ Updated disposable domains list: +${addedCount} new domains (total: ${mergedSet.size})`);
+				this.logger.info(
+					`✅ Updated disposable domains list: +${addedCount} new domains (total: ${mergedSet.size})`
+				);
 			} else {
 				this.logger.info(`✅ Disposable domains list is up to date (${mergedSet.size} domains)`);
 			}
